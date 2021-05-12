@@ -9,11 +9,31 @@ function customerSuccessBalancing(
   customers,
   customerSuccessAway
 ) {
-  /**
-   * ===============================================
-   * =========== Write your solution here ==========
-   * ===============================================
-   */
+  // get customer success
+  const css = customerSuccess
+    // remove away customers
+    .filter(({ id }) => !customerSuccessAway.includes(id))
+
+    // order by score
+    .sort((a, b) => a.score - b.score);
+
+  // order by score
+  const C = customers.reduce((acumulador, valor) => {
+    // find first customer success
+    const cs = css.find(c => c.score >= valor.score);
+
+    // customer success found: increment
+    if (cs) {
+      acumulador.set(cs.id, (acumulador.get(cs.id) || 0) + 1);
+    }
+    // return customers incremented
+    return acumulador;
+  }, new Map());
+
+  // order by
+  const [first = [], second = []] = [...C].sort((a, b) => b[1] - a[1])
+
+  return first[1] === second[1] ? 0 : first[0];
 }
 
 test("Scenario 1", () => {
