@@ -9,32 +9,88 @@ function customerSuccessBalancing(
   customers,
   customerSuccessAway
 ) {
-  // get customer success
-  const css = customerSuccess
-    // remove away customers
+  // get available customer success
+  const availableCS = customerSuccess
     .filter(({ id }) => !customerSuccessAway.includes(id))
-
-    // order by score
     .sort((a, b) => a.score - b.score);
 
-  // order by score
-  const C = customers.reduce((acumulador, valor) => {
-    // find first customer success
-    const cs = css.find(c => c.score >= valor.score);
+  // get ordered list with customer scores
+  let customerScores = customers.map(({ score }) => score).sort((a, b) => a - b);
 
-    // customer success found: increment
-    if (cs) {
-      acumulador.set(cs.id, (acumulador.get(cs.id) || 0) + 1);
-    }
-    // return customers incremented
-    return acumulador;
-  }, new Map());
+  // create balancer to record the number of customers per customer success
+  const balancer = new Map();
 
-  // order by
-  const [first = [], second = []] = [...C].sort((a, b) => b[1] - a[1])
+  // balance service load between customer success by score
+  availableCS.map(({ id, score }) => {
+    // get total customers by score
+    const total = getTotalCustomers(customerScores, score);
 
-  return first[1] === second[1] ? 0 : first[0];
+    // set total customers to active customer success
+    balancer.set(id, total);
+
+    // remove customers score that have already been balanced
+    customerScores.splice(0, total);
+  });
+
+  // no active customer success: return 0
+  if (!balancer.size) return 0;
+
+  // create active customer success array from balancer map
+  const activeCS = Array.from(balancer, ([id, total]) => ({ id, total }))
+
+  // get first and second most overloaded customer success
+  const [first = {}, second = {}] = activeCS.sort((a, b) => b.total - a.total);
+
+  // return 0 if the first and the second total are the same or return first id
+  return first.total === second.total ? 0 : first.id;
 }
+
+
+/**
+ * Returns the amount of elements less than or equal to a value
+ * @param {array}  list
+ * @param {number} value
+ * @param {number} start
+ * @param {number} end
+ */
+function binarySearch(list, value, start = 0, end = 0) {
+  // end unavailable: set end to the last list index
+  if (!end) end = list.length - 1;
+
+  // binary search
+  while (start <= end) {
+    // get the list middle
+    let middle = Math.floor((start + end) / 2);
+
+    // value is less than or equal to middle value: search from the next index
+    if (list[middle] <= value) start = middle + 1;
+
+    // search up to the previous index
+    else end = middle - 1;
+  }
+
+  // return amount
+  return end + 1;
+}
+
+
+/**
+ * Returns the number of Customers to be served by a CustomerSuccess
+ * @param {array}  scores
+ * @param {number} score
+ */
+function getTotalCustomers(scores, score) {
+  // get total and last index
+  const total = scores.length;
+  const lastIndex = total - 1;
+
+  // score is higher than the last score: return total
+  if (score > scores[lastIndex]) return total;
+
+  // return total from binary search
+  return binarySearch(scores, score);
+}
+
 
 test("Scenario 1", () => {
   css = [
@@ -64,6 +120,14 @@ function buildSizeEntities(size, score) {
   return result;
 }
 
+function buildCsAway(size) {
+  const result = [];
+  for (let i = 0; i < size;) {
+    result.push(++i);
+  }
+  return result;
+}
+
 function mapEntities(arr) {
   return arr.map((item, index) => ({
     id: index + 1,
@@ -86,7 +150,7 @@ test("Scenario 3", () => {
   css = buildSizeEntities(1000, 0);
   css[998].score = 100;
   customers = buildSizeEntities(10000, 10);
-  csAway = [1000];
+
 
   expect(customerSuccessBalancing(css, customers, csAway)).toEqual(999);
 
